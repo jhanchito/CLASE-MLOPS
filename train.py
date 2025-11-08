@@ -110,3 +110,59 @@ print("\nEvaluation results:\n", metrics_output)
 
 with open('metrics.txt', 'w', encoding='utf-8') as outfile:
     outfile.write(metrics_output)
+
+
+
+# --- 8. GENERACIÓN DE GRÁFICOS ---
+print("\nGenerando visualizaciones de métricas...")
+
+# Gráfico 1: Historial de Entrenamiento (Precisión y Pérdida)
+plt.figure(figsize=(14, 6))
+
+# Subgráfico de Precisión
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='Precisión (Entrenamiento)')
+plt.plot(history.history['val_accuracy'], label='Precisión (Validación)')
+plt.title('Historial de Precisión del Modelo')
+plt.xlabel('Época')
+plt.ylabel('Precisión')
+plt.legend(loc='lower right')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+# Subgráfico de Pérdida
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='Pérdida (Entrenamiento)')
+plt.plot(history.history['val_loss'], label='Pérdida (Validación)')
+plt.title('Historial de Pérdida del Modelo')
+plt.xlabel('Época')
+plt.ylabel('Pérdida')
+plt.legend(loc='upper right')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.savefig('training_history.png')
+plt.close() # Cerrar la figura para liberar memoria
+
+# Gráfico 2: Matriz de Confusión
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues', 
+        xticklabels=label_names, yticklabels=label_names)
+plt.title('Matriz de Confusión')
+plt.xlabel('Etiqueta Predicha')
+plt.ylabel('Etiqueta Verdadera')
+plt.savefig('confusion_matrix.png')
+plt.close()
+
+# Gráfico 3: Reporte de Clasificación (Heatmap)
+# Extraer las métricas por clase (excluyendo promedios)
+report_df = pd.DataFrame(class_report_dict).T
+metrics_to_plot = report_df.loc[label_names, ['precision', 'recall', 'f1-score']]
+
+plt.figure(figsize=(10, 5))
+sns.heatmap(metrics_to_plot, annot=True, cmap='viridis', fmt='.2f')
+plt.title('Reporte de Clasificación (Precisión, Recall, F1-Score)')
+plt.savefig('classification_report_heatmap.png')
+plt.close()
+
+print("Visualizaciones guardadas como 'training_history.png', 'confusion_matrix.png' y 'classification_report_heatmap.png'")
+print("\n--- Proceso completado ---")
