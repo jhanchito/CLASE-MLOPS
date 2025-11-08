@@ -17,3 +17,7 @@ jobs:
           cat metrics.txt >> report.md
           echo "![](./plot.png)" >> report.md
           cml comment create report.md
+
+          cat metrics.txt >> README.md
+          echo "![](./plot.png)" >> README.md
+          cml comment create README.md
