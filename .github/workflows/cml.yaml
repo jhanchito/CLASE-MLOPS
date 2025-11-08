@@ -14,10 +14,28 @@ jobs:
           pip install -r requirements.txt
           python train.py
 
+          # --- Crear el Reporte ---
+          # Sobrescribe report.md con las métricas (usa > en lugar de >> la primera vez)
+          echo "## Resultados del Modelo" > report.md
           cat metrics.txt >> report.md
-          echo "![](./plot.png)" >> report.md
+          
+          # Añadir las 3 imágenes generadas al reporte
+          echo "### Historial de Entrenamiento" >> report.md
+          echo "![](./training_history.png)" >> report.md
+          
+          echo "### Matriz de Confusión" >> report.md
+          echo "![](./confusion_matrix.png)" >> report.md
+          
+          echo "### Reporte de Clasificación" >> report.md
+          echo "![](./classification_report_heatmap.png)" >> report.md
+          
+          # Publicar el reporte como un comentario
           cml comment create report.md
+          
+          # cat metrics.txt >> report.md
+          # echo "![](./plot.png)" >> report.md
+          # cml comment create report.md
 
-          cat metrics.txt >> README.md
-          echo "![](./plot.png)" >> README.md
-          cml comment create README.md
+          # cat metrics.txt >> README.md
+          # echo "![](./plot.png)" >> README.md
+          # cml comment create README.md
