@@ -21,123 +21,90 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-# --- 1. Configuración y Carga de Datos ---
+DATA_PATH = Path(__file__).resolve().parent / "data" / "base_encuestados_v2.csv"
+df = pd.read_csv(DATA_PATH).head(1000)     
 
-# Asegurarse de que el directorio de modelos exista
-os.makedirs('models', exist_ok=True)
-
-# Asumir que 'data' es un subdirectorio en la misma carpeta que el script
-# Si tu .csv está en otro lugar, ajusta esta ruta
-try:
-    DATA_PATH = Path(__file__).resolve().parent / "data" / "base_encuestados_v2.csv"
-    df = pd.read_csv(DATA_PATH).head(1000)
-except FileNotFoundError:
-    print(f"Error: No se encontró el archivo 'base_encuestados_v2.csv' en la carpeta 'data'.")
-    print("Por favor, asegúrate de que el archivo exista en la ruta correcta.")
-    # Crear un DataFrame de ejemplo para que el script no falle
-    print("Creando DataFrame de ejemplo para continuar...")
-    df = pd.DataFrame({
-        'Comentarios': [
-            'excelente servicio, muy rapido', 'me encanto la atencion', 'buen producto',
-            'no me gusto, muy lento', 'mal servicio, no lo recomiendo', 'terrible experiencia',
-            'mas o menos', 'podria mejorar', 'regular'
-        ] * 100,
-        'NPS': ['Promotor', 'Promotor', 'Promotor', 
-                'Detractor', 'Detractor', 'Detractor',
-                'Pasivo', 'Pasivo', 'Pasivo'] * 100
-    })
-    df = df.head(1000)
-except Exception as e:
-    print(f"Ocurrió un error al cargar los datos: {e}")
-    exit()
-
-
-# --- 2. Preprocesamiento de Datos ---
 df = df[['Comentarios','NPS']].dropna().copy()
-df['Comentarios'] = df['Comentarios'].astype(str).apply(lambda x: x.lower())
+df['Comentarios'] = df['Comentarios'].apply(lambda x: x.lower())
 df['Comentarios'] = df['Comentarios'].apply(lambda x: re.sub(r'[^a-zA-z0-9\s]', '', x))
+
 
 le = LabelEncoder()
 df['NPS_encoded'] = le.fit_transform(df['NPS'])
-# Guardar los nombres de las clases para los gráficos
-label_names = list(le.classes_)
-print(f"Clases codificadas: {list(zip(le.classes_, le.transform(le.classes_)))}")
-
+# integer labels for modeling
 y = df['NPS_encoded'].values
 
-# Tokenización
+
 max_features = 1000
 tokenizer = Tokenizer(num_words=max_features, split = ' ')
 tokenizer.fit_on_texts(df['Comentarios'].values)
 X = tokenizer.texts_to_sequences(df['Comentarios'].values)
 X = pad_sequences(X)
-print(f"Dimensiones de secuencias (X): {X.shape}")
+print(X.shape)
 
-# Guardar el tokenizer
-with open('models/tokenizer.pickle', 'wb') as tk:
-    pickle.dump(tokenizer, tk, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-# --- 3. Construcción del Modelo ---
 emdeb_dim = 50
 model = Sequential()
 model.add(Embedding(max_features, emdeb_dim, input_length = X.shape[1]))
-model.add(LSTM(10)) # LSTM con 10 unidades
+model.add(LSTM(10))
 model.add(Dense(len(df['NPS_encoded'].unique()), activation='softmax'))
 model.compile(loss = 'categorical_crossentropy', optimizer='adam', metrics = ['accuracy'])
 print(model.summary())
 
 
-# --- 4. Entrenamiento y División de Datos ---
-y_categorical = pd.get_dummies(df['NPS_encoded']).values
+y = pd.get_dummies(df['NPS_encoded']).values
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y_categorical, test_size=0.2, random_state=1901)
+    X, y, test_size=0.2, random_state=1901)
+print(X_train.shape, y_train.shape)
+print(X_test.shape, y_test.shape)
 
-print(f"Dimensiones de entrenamiento: X_train {X_train.shape}, y_train {y_train.shape}")
-print(f"Dimensiones de prueba: X_test {X_test.shape}, y_test {y_test.shape}")
 
 # Capturar el historial de entrenamiento
-history = model.fit(
-    X_train, 
-    y_train, 
-    epochs=10, # Aumentado a 10 épocas para mejores gráficos
-    verbose=1, 
-    validation_data=(X_test, y_test)
-)
+history = model.fit(X_train, y_train, epochs=5, verbose=1, validation_data=(X_test, y_test))
 
-# --- 5. Predicción de Ejemplo ---
 test = ['El servicio fue excelente y muy rápido']
-test_seq = tokenizer.texts_to_sequences(test)
-test_pad = pad_sequences(test_seq, maxlen=X.shape[1], dtype='int32', value=0)
+test = tokenizer.texts_to_sequences(test)
+test = pad_sequences(test, maxlen=X.shape[1], dtype='int32', value=0)
+print(model.predict(test))
+sentiment = model.predict(test)[0]
+if(np.argmax(sentiment) == 0):
+    print("Detractor")
+elif (np.argmax(sentiment) == 1):
+    print("Pasivo")
+else:
+    print("Promotor")
 
-sentiment_prob = model.predict(test_pad)[0]
-sentiment_idx = np.argmax(sentiment_prob)
-sentiment_label = le.inverse_transform([sentiment_idx])[0]
-print(f"Predicción para '{test[0]}': {sentiment_label} (Confianza: {sentiment_prob[sentiment_idx]:.2f})")
 
 
-# --- 6. Guardado del Modelo ---
+
+with open('models/tokenizer.pickle', 'wb') as tk:
+    pickle.dump(tokenizer, tk, protocol=pickle.HIGHEST_PROTOCOL)
+
 model_json = model.to_json()
 with open("models/model.json", "w") as js:
     js.write(model_json)
-model.save_weights('models/model.weights.h5')
-print("Modelo y tokenizer guardados en la carpeta 'models/'.")
+
+model.save_weights('models/.model.weights.h5')
 
 
-# --- 7. Evaluación del Modelo y Métricas ---
+
+# --- New evaluation on X_test and saving metrics to file ---
+# Convert one-hot y_test back to label indices
 y_test_labels = np.argmax(y_test, axis=1)
+
+# Predict on X_test
 y_preds_probs = model.predict(X_test)
 y_preds_labels = np.argmax(y_preds_probs, axis=1)
 
-# Calcular métricas
+# Compute metrics
 acc = accuracy_score(y_test_labels, y_preds_labels)
 mae_val = np.round(float(mean_absolute_error(y_test_labels, y_preds_labels)), 2)
 mse_val = np.round(float(mean_squared_error(y_test_labels, y_preds_labels)), 2)
 conf_mat = confusion_matrix(y_test_labels, y_preds_labels)
-class_report = classification_report(y_test_labels, y_preds_labels, target_names=label_names, zero_division=0)
-class_report_dict = classification_report(y_test_labels, y_preds_labels, target_names=label_names, zero_division=0, output_dict=True)
+# classification report with original label names (in encoder order)
+label_names = list(le.classes_)
 
-# Guardar métricas en archivo de texto
+class_report = classification_report(y_test_labels, y_preds_labels, target_names=label_names, zero_division=0)
+
 metrics_text = []
 metrics_text.append(f"Accuracy = {acc:.4f}")
 metrics_text.append(f"Mean Absolute Error = {mae_val}")
@@ -148,12 +115,11 @@ metrics_text.append("\nConfusion Matrix:")
 metrics_text.append(np.array2string(conf_mat))
 
 metrics_output = "\n".join(metrics_text)
-print("\n--- Resultados de Evaluación ---")
-print(metrics_output)
+print("\nEvaluation results:\n", metrics_output)
 
 with open('metrics.txt', 'w', encoding='utf-8') as outfile:
     outfile.write(metrics_output)
-print("\nMétricas guardadas en 'metrics.txt'")
+
 
 
 # --- 8. GENERACIÓN DE GRÁFICOS ---
@@ -189,7 +155,7 @@ plt.close() # Cerrar la figura para liberar memoria
 # Gráfico 2: Matriz de Confusión
 plt.figure(figsize=(8, 6))
 sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues', 
-            xticklabels=label_names, yticklabels=label_names)
+        xticklabels=label_names, yticklabels=label_names)
 plt.title('Matriz de Confusión')
 plt.xlabel('Etiqueta Predicha')
 plt.ylabel('Etiqueta Verdadera')
