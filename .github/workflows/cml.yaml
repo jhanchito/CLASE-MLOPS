@@ -6,36 +6,55 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-      - uses: iterative/setup-cml@v1
-      - name: Train model
+      - uses: iterative/setup-cml@v2
+      - name: Train model, create report, and commit artifacts
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 1. INSTALAR Y ENTRENAR (Como antes)
           pip install -r requirements.txt
           python train.py
-
-          # --- Crear el Reporte ---
-          # Sobrescribe report.md con las métricas (usa > en lugar de >> la primera vez)
+          
+          # 2. CREAR EL REPORTE (Como antes)
           echo "## Resultados del Modelo" > report.md
           cat metrics.txt >> report.md
-          
-          # Añadir las 3 imágenes generadas al reporte
           echo "### Historial de Entrenamiento" >> report.md
           echo "![](./training_history.png)" >> report.md
-          
           echo "### Matriz de Confusión" >> report.md
           echo "![](./confusion_matrix.png)" >> report.md
-          
           echo "### Reporte de Clasificación" >> report.md
           echo "![](./classification_report_heatmap.png)" >> report.md
           
-          # Publicar el reporte como un comentario
+          # 3. PUBLICAR COMENTARIO CML (Como antes)
+          # Esto sigue siendo útil para ver el reporte en el commit
           cml comment create report.md
           
-          # cat metrics.txt >> report.md
-          # echo "![](./plot.png)" >> report.md
-          # cml comment create report.md
+          # 4. CONFIGURAR GIT PARA HACER COMMIT
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions-bot@github.com"
+          
+          # 5. AÑADIR LOS NUEVOS ARCHIVOS AL STAGE
+          # git add metrics.txt
+          # git add report.md
+          # git add training_history.png
+          # git add confusion_matrix.png
+          # git add classification_report_heatmap.png
+          git add -A
 
-          # cat metrics.txt >> README.md
-          # echo "![](./plot.png)" >> README.md
-          # cml comment create README.md
+          # Opcional: Si también quieres guardar los modelos entrenados
+          # git add models/model.json
+          # git add models/model.weights.h5
+          # git add models/tokenizer.pickle
+          
+          # 6. HACER COMMIT Y PUSH (SOLO SI HAY CAMBIOS)
+          # Comprueba si hay algo que "commitear"
+          if ! git diff-index --quiet HEAD; then
+            echo "Se encontraron cambios, haciendo commit..."
+            # El [skip ci] es VITAL para evitar bucles infinitos
+            git commit -m "Update model report and metrics [skip ci]"
+            
+            # Empujar los cambios a la rama actual
+            git push
+          else
+            echo "No se encontraron cambios en los artefactos."
+          fi
