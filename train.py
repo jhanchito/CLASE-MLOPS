@@ -58,7 +58,8 @@ print(X_train.shape, y_train.shape)
 print(X_test.shape, y_test.shape)
 
 
-model.fit(X_train, y_train, epochs=5, verbose=1, validation_data=(X_test, y_test))
+# Capturar el historial de entrenamiento
+history = model.fit(X_train, y_train, epochs=5, verbose=1, validation_data=(X_test, y_test))
 
 test = ['El servicio fue excelente y muy rápido']
 test = tokenizer.texts_to_sequences(test)
