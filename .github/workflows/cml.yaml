@@ -24,7 +24,8 @@ jobs:
           echo "![](./confusion_matrix.png)" >> report.md
           echo "### Reporte de Clasificación" >> report.md
           echo "![](./classification_report_heatmap.png)" >> report.md
-          
+          cp report.md README.md
+
           # 3. PUBLICAR COMENTARIO CML (Como antes)
           # Esto sigue siendo útil para ver el reporte en el commit
           cml comment create report.md
